@@ -4,7 +4,8 @@ const isDevelopment =
 const ws = new WebSocket(
   isDevelopment
     ? "ws://localhost:8787/mafia"
-    : "wss://smolgames.xyaah.workers.dev/mafia"
+    : "ws://smolgames.xyaah.workers.dev/mafia",
+  ["ws"]
 );
 
 ws.addEventListener("message", (e) => {
