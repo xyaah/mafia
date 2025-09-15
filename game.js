@@ -32,8 +32,16 @@ let others = [];
 let otherMafias = [];
 let myRole;
 
+function removeChildren(el) {
+  while (el.children.length > 0) el.removeChild(el.children[0]);
+}
+
 function print(text) {
   story.innerText += "\n> " + text;
+}
+
+function getMe() {
+  return [...lobbyOthers, ...others].find((x) => x.me);
 }
 
 function isLobbyOwner() {
@@ -43,7 +51,7 @@ function isLobbyOwner() {
 
 function updateLobby() {
   const players = document.querySelector("#lobby #players");
-  while (players.children.length > 0) players.removeChild(players.children[0]);
+  removeChildren(players);
 
   for (const other of lobbyOthers) {
     const el = document.createElement("li");
@@ -86,23 +94,33 @@ function roleRevealed(role) {
 }
 
 function startTime(at, ms) {
-  return new Promise((res) => {
-    let interval;
-    interval = setInterval(() => {
-      const timePassed = Date.now() - at;
-      const timeRem = Math.max(0, ms - timePassed) / 1000;
-      if (timeRem === 0) {
+  let doCancel = () => {};
+  return {
+    promise: new Promise((res) => {
+      timer.display.style = "unset";
+      let interval;
+      function stop() {
+        timer.display.style = "none";
+        timer.innerText = "";
         clearInterval(interval);
         res();
-      } else {
-        const min = Math.floor(timeRem / 60);
-        const sec = Math.floor(timeRem % 60);
-        timer.innerText = `${min.toString().padStart(2, "0")}:${sec
-          .toString()
-          .padStart(2, "0")}`;
       }
-    }, 30);
-  });
+      doCancel = stop;
+      interval = setInterval(() => {
+        const timePassed = Date.now() - at;
+        const timeRem = Math.max(0, ms - timePassed) / 1000;
+        if (timeRem === 0) stop();
+        else {
+          const min = Math.floor(timeRem / 60);
+          const sec = Math.floor(timeRem % 60);
+          timer.innerText = `${min.toString().padStart(2, "0")}:${sec
+            .toString()
+            .padStart(2, "0")}`;
+        }
+      }, 30);
+    }),
+    cancel: () => doCancel(),
+  };
 }
 
 function nightTime() {
@@ -110,17 +128,17 @@ function nightTime() {
 }
 
 /** @returns {Promise<number|undefined>} */
-function askSelectPlayer(timeout) {
+function askSelectPlayer(timeout, showOtherMafias) {
   return new Promise((res) => {
     let resolved = false;
     /** @type {HTMLUListElement} */
     const selector = document.querySelector("#player-selector");
-    while (selector.children.length) selector.removeChild(selector.children[0]);
+    removeChildren(selector);
     function hide() {
       selector.style.display = "none";
     }
     for (const other of others) {
-      if (otherMafias.includes(other.id)) continue;
+      if (otherMafias.includes(other.id) && !showOtherMafias) continue;
       const el = document.createElement("li");
       const btn = document.createElement("button");
       btn.innerText = other.name;
@@ -145,17 +163,77 @@ function askSelectPlayer(timeout) {
   });
 }
 
-function showChat(show) {}
+const chatContainer = document.querySelector("#chat-container");
+const chatHistory = document.querySelector("#chat-history");
+const chatMessage = document.querySelector("#chat-message");
+let isCurChatMafia;
+
+chatMessage.addEventListener("keyup", (e) => {
+  if (e.code === "Enter") {
+    const content = chatMessage.value;
+    ws.send(
+      `${isCurChatMafia ? "mafia_chat_send" : "town_chat_send"} ${content}`
+    );
+    chatMessage.value = "";
+  }
+});
+
+function onChatMessage(from, content) {
+  const li = document.createElement("li");
+  const sender = others.find((other) => other.id === from);
+  li.innerText = `${sender.name}: ${content}`;
+  chatHistory.appendChild(li);
+}
+
+function showChat(isMafiaChat, show) {
+  console.log(`show ${isMafiaChat ? "mafia" : "town"} chat: ${show}`);
+  isCurChatMafia = isMafiaChat;
+  chatContainer.style.display = show ? "unset" : "none";
+  const myName = getMe().name;
+  document.querySelector(
+    'label[for="chat-message"]'
+  ).innerText = `${myName} -> ${isMafiaChat ? "mafia" : "town"}: `;
+  removeChildren(chatHistory);
+}
 
 function mafiaAskVote() {
   const timeAlloted = 3 * 60 * 1000;
   print("the mafia gathers secretly to decide on someone to kill...");
-  showChat(true);
-  startTime(Date.now(), timeAlloted).then(() => showChat(false));
-  askSelectPlayer(timeAlloted).then((player) => {
+  const time = startTime(Date.now(), timeAlloted);
+  time.promise.then(() => showChat(true, false));
+  askSelectPlayer(timeAlloted, false).then((player) => {
+    time.cancel();
     if (player) {
       ws.send(`mafia_vote ${player}`);
     }
+  });
+}
+function discussionTime() {
+  const timeAlloted = 3 * 60 * 1000;
+  print("the town holds a meeting to discover the mafias...");
+  const time = startTime(Date.now(), timeAlloted);
+  time.promise.then(() => showChat(false, false));
+  askSelectPlayer(timeAlloted, true).then((player) => {
+    time.cancel();
+    if (player) {
+      ws.send(`day_kick_vote ${player}`);
+    }
+  });
+}
+
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+function dayTime(mafiaKilled) {
+  print("the sun rises, and another day begins");
+  sleep(1500).then(() => {
+    mafiaKilled == null
+      ? print("it seems everyone has survived this night")
+      : print(
+          "the town soon discovers that " +
+            others.find((other) => other.id === mafiaKilled).name +
+            " was killed last night by the mafia"
+        );
+    removePlayer(mafiaKilled);
   });
 }
 
@@ -166,14 +244,26 @@ function onDied(causeOfDeath) {
       break;
 
     case "town_vote":
-      print(
-        "the town has decided to banish you. this is where your story ends"
-      );
+      print("the town has banished you. this is where your story ends");
       break;
 
     default:
       break;
   }
+}
+
+function dayVoteResult(result) {
+  const voted =
+    result == null ? null : others.find((other) => other.id === result);
+  if (!voted.me) print("the town has decided to banish " + voted.name);
+  removePlayer(voted.id);
+}
+
+function removePlayer(id) {
+  others.splice(
+    others.findIndex((other) => other.id === id),
+    1
+  );
 }
 
 ws.addEventListener("message", (e) => {
@@ -225,6 +315,30 @@ ws.addEventListener("message", (e) => {
       onDied(causeOfDeath);
       break;
     }
+    case "mafia_chat_status":
+    case "town_chat_status": {
+      showChat(type === "mafia_chat_status", args[0] === "true");
+      break;
+    }
+    case "town_chat":
+    case "mafia_chat": {
+      onChatMessage(Number.parseInt(args[0]), args.slice(1).join(" "));
+      break;
+    }
+    case "discussion_time": {
+      discussionTime();
+      break;
+    }
+    case "daytime": {
+      const mafiaKilled = args[0] === "null" ? null : Number.parseInt(args[0]);
+      dayTime(mafiaKilled);
+      break;
+    }
+    case "day_vote_result": {
+      const result = args[0] === "null" ? null : Number.parseInt(args[0]);
+      dayVoteResult(result);
+      break;
+    }
     default:
       break;
   }
@@ -232,6 +346,7 @@ ws.addEventListener("message", (e) => {
 
 ws.addEventListener("open", () => {
   const name = prompt("Enter a name to play with:");
+  document.querySelector('label[for="chat-message"]').innerText = name + ":";
   ws.send(`join ${name.trim()}`);
 });
 
