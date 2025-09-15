@@ -342,6 +342,22 @@ ws.addEventListener("message", (e) => {
       dayVoteResult(result);
       break;
     }
+    case "win":
+      print("you have won this game as a " + Role[Number.parseInt(args[0])]) +
+        ". " +
+        args[1] +
+        " players survived while " +
+        args[2] +
+        " players died";
+      break;
+    case "loss":
+      print("you have lost this game as a " + Role[Number.parseInt(args[0])]) +
+        ". " +
+        args[1] +
+        " players survived while " +
+        args[2] +
+        " players died";
+      break;
     default:
       break;
   }
