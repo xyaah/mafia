@@ -8,6 +8,28 @@ const ws = new WebSocket(
   [isDevelopment ? "ws" : "wss"]
 );
 
+const textContent = {
+  "suspense.gameStart":
+    "you enter a strange new land, surrounded by unknown people.",
+  "suspense.identityReveal": "your identity is revealed.. ",
+  "time.night": "night falls over the town. you are immersed in darkness..",
+  "activity.mafiaGathering":
+    "the mafia gathers secretly to decide on someone to kill...",
+  "activity.meeting": "the town holds a meeting to discover the mafias...",
+  "time.day": "the sun rises, and another day begins",
+  "announcement.allSurvived": "it seems everyone has survived this night",
+  "announcement.killed":
+    "the town soon discovers that $0 was killed last night by the mafia",
+  "killed.mafia": "the mafia has killed you. this is it for you",
+  "killed.vote": "the town has banished you. this is where your story ends",
+  "activity.banished": "the town has decided to banish $0",
+  "activity.banished.fail": "the town couldn't agree on someone to banish",
+  "activity.win":
+    "you have won this game as a $0. $1 players survived while $2 players died",
+  "activity.loss":
+    "you have lost this game as a $0. $1 players survived while $2 players died",
+};
+
 const Role = {
   Townsperson: 0,
   Mafia: 1,
@@ -30,8 +52,13 @@ function removeChildren(el) {
   while (el.children.length > 0) el.removeChild(el.children[0]);
 }
 
-function print(text) {
-  story.innerText += "\n> " + text;
+function print(textId, ...args) {
+  /** @type {string} */
+  let string = textContent[textId] ?? textId;
+  for (let i = 0; i < args.length; i++) {
+    string = string.replaceAll("$" + i, args[i]);
+  }
+  story.innerText += "\n> " + string;
 }
 
 function getMe() {
@@ -71,8 +98,8 @@ function gameStarted() {
   lobbyOthers = [];
   document.querySelector("#lobby").style.display = "none";
   document.querySelector("#game-container").style.display = "unset";
-  print(`you enter a strange new land, surrounded by unknown people.`);
-  setTimeout(() => print("your identity is revealed.. "), 4000);
+  print("suspense.gameStart");
+  setTimeout(() => print("suspense.identityReveal"), 4000);
 }
 
 function roleName(role) {
@@ -92,10 +119,10 @@ function startTime(at, ms) {
   let doCancel = () => {};
   return {
     promise: new Promise((res) => {
-      timer.display.style = "unset";
+      timer.style.display = "unset";
       let interval;
       function stop() {
-        timer.display.style = "none";
+        timer.style.display = "none";
         timer.innerText = "";
         clearInterval(interval);
         res();
@@ -119,7 +146,7 @@ function startTime(at, ms) {
 }
 
 function nightTime() {
-  print("night falls over the town. you are immersed in darkness..");
+  print("time.night");
 }
 
 /** @returns {Promise<number|undefined>} */
@@ -194,7 +221,7 @@ function showChat(isMafiaChat, show) {
 
 function mafiaAskVote() {
   const timeAlloted = 3 * 60 * 1000;
-  print("the mafia gathers secretly to decide on someone to kill...");
+  print("activity.mafiaGathering");
   const time = startTime(Date.now(), timeAlloted);
   time.promise.then(() => showChat(true, false));
   askSelectPlayer(timeAlloted, false).then((player) => {
@@ -206,7 +233,7 @@ function mafiaAskVote() {
 }
 function discussionTime() {
   const timeAlloted = 3 * 60 * 1000;
-  print("the town holds a meeting to discover the mafias...");
+  print("activity.meeting");
   const time = startTime(Date.now(), timeAlloted);
   time.promise.then(() => showChat(false, false));
   askSelectPlayer(timeAlloted, true).then((player) => {
@@ -220,14 +247,13 @@ function discussionTime() {
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 function dayTime(mafiaKilled) {
-  print("the sun rises, and another day begins");
+  print("time.day");
   sleep(1500).then(() => {
     mafiaKilled == null
-      ? print("it seems everyone has survived this night")
+      ? print("announcement.allSurvived")
       : print(
-          "the town soon discovers that " +
-            others.find((other) => other.id === mafiaKilled).name +
-            " was killed last night by the mafia"
+          "announcement.killed",
+          others.find((other) => other.id === mafiaKilled).name
         );
     removePlayer(mafiaKilled);
   });
@@ -236,11 +262,11 @@ function dayTime(mafiaKilled) {
 function onDied(causeOfDeath) {
   switch (causeOfDeath) {
     case "mafia_kill":
-      print("the mafia has killed you. this is it for you");
+      print("killed.mafia");
       break;
 
     case "town_vote":
-      print("the town has banished you. this is where your story ends");
+      print("killed.vote");
       break;
 
     default:
@@ -251,8 +277,8 @@ function onDied(causeOfDeath) {
 function dayVoteResult(result) {
   const voted =
     result == null ? null : others.find((other) => other.id === result);
-  if (!voted.me) print("the town has decided to banish " + voted.name);
-  if (voted === null) print("the town couldn't agree on someone to banish");
+  if (!voted.me) print("activity.banished", voted.name);
+  if (voted === null) print("activity.banished.fail");
   removePlayer(voted.id);
 }
 
@@ -338,16 +364,18 @@ ws.addEventListener("message", (e) => {
     }
     case "win":
       print(
-        `you have won this game as a ${roleName(Number.parseInt(args[0]))}. ${
-          args[1]
-        } players survived while ${args[2]} players died`
+        "activity.win",
+        roleName(Number.parseInt(args[0])),
+        args[1],
+        args[2]
       );
       break;
     case "loss":
       print(
-        `you have lost this game as a ${roleName(Number.parseInt(args[0]))}. ${
-          args[1]
-        } players survived while ${args[2]} players died`
+        "activity.loss",
+        roleName(Number.parseInt(args[0])),
+        args[1],
+        args[2]
       );
       break;
     default:
