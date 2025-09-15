@@ -1,0 +1,89 @@
+:root {
+  --content-bg-color: #333;
+  --bg-color: #111;
+  --content-nested-bg-color: #222;
+  --text-color: #eaeaea;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+body,
+#lobby,
+#game-container {
+  margin: 0
+}
+
+#lobby,
+#game-container {
+  width: 90%;
+  height: 95%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--content-bg-color);
+  border-radius: 10px;
+}
+
+#lobby #players {
+  width: 38%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: var(--content-nested-bg-color);
+  margin: 0;
+  list-style: none;
+  padding-left: 5px;
+  border-top-right-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
+
+#lobby #players li {
+  padding-top: 1px;
+  padding-bottom: 1px;
+  width: 90%
+}
+
+#start-game {
+  position: absolute;
+  top: 50%;
+  left: 30%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  height: 120px;
+  border-radius: 50px;
+  background-color: red;
+  font-size: 300%;
+  color: black;
+  border-color: #441111;
+  border-width: 5px;
+  outline: none;
+}
+
+#start-game:hover:not(:disabled) {
+  outline: none;
+  border-color: #991111
+}
+
+#start-game:disabled {
+  border-color: black;
+  background-color: grey;
+  color: white;
+}
+
+#timer {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, 0);
+  width: 20px;
+  height: 10px;
+  background-color: var(--content-nested-bg-color);
+  color: var(--text-color);
+  text-align: center;
+  vertical-align: middle;
+}
