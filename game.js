@@ -256,6 +256,7 @@ function dayVoteResult(result) {
   const voted =
     result == null ? null : others.find((other) => other.id === result);
   if (!voted.me) print("the town has decided to banish " + voted.name);
+  if (voted === null) print("the town couldn't agree on someone to banish");
   removePlayer(voted.id);
 }
 
