@@ -76,6 +76,7 @@ function gameStarted() {
   others = [...lobbyOthers];
   lobbyOthers = [];
   document.querySelector("#lobby").style.display = "none";
+  document.querySelector("#game-container").style.display = "none";
   print(`you enter a strange new land, surrounded by unknown people.`);
   setTimeout(() => print("your identity is revealed.. "), 4000);
 }
