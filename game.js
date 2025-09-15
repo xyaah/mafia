@@ -76,7 +76,7 @@ function gameStarted() {
   others = [...lobbyOthers];
   lobbyOthers = [];
   document.querySelector("#lobby").style.display = "none";
-  document.querySelector("#game-container").style.display = "none";
+  document.querySelector("#game-container").style.display = "unset";
   print(`you enter a strange new land, surrounded by unknown people.`);
   setTimeout(() => print("your identity is revealed.. "), 4000);
 }
@@ -140,6 +140,7 @@ function askSelectPlayer(timeout, showOtherMafias) {
     }
     for (const other of others) {
       if (otherMafias.includes(other.id) && !showOtherMafias) continue;
+      if (other.me) continue;
       const el = document.createElement("li");
       const btn = document.createElement("button");
       btn.innerText = other.name;
