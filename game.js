@@ -1,16 +1,10 @@
-async function getPastebin(code) {
-  return (
-    await (await fetch("https://pastebin.com/raw/" + code)).text()
-  ).trim();
-}
-
 const isDevelopment =
   location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
 const ws = new WebSocket(
   isDevelopment
-    ? "ws://localhost:8080"
-    : await getPastebin(prompt("Enter game code")),
+    ? "ws://localhost:8787/"
+    : "wss://mafia-matchmaker.xya.workers.dev/",
   [isDevelopment ? "ws" : "wss"]
 );
 
@@ -343,20 +337,18 @@ ws.addEventListener("message", (e) => {
       break;
     }
     case "win":
-      print("you have won this game as a " + Role[Number.parseInt(args[0])]) +
-        ". " +
-        args[1] +
-        " players survived while " +
-        args[2] +
-        " players died";
+      print(
+        `you have won this game as a ${roleName(Number.parseInt(args[0]))}. ${
+          args[1]
+        } players survived while ${args[2]} players died`
+      );
       break;
     case "loss":
-      print("you have lost this game as a " + Role[Number.parseInt(args[0])]) +
-        ". " +
-        args[1] +
-        " players survived while " +
-        args[2] +
-        " players died";
+      print(
+        `you have lost this game as a ${roleName(Number.parseInt(args[0]))}. ${
+          args[1]
+        } players survived while ${args[2]} players died`
+      );
       break;
     default:
       break;
