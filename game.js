@@ -48,8 +48,16 @@ let others = [];
 let otherMafias = [];
 let myRole;
 
-function removeChildren(el) {
-  while (el.children.length > 0) el.removeChild(el.children[0]);
+/** @param {HTMLElement} el  */
+function removeChildren(el, type) {
+  if (!type) while (el.children.length > 0) el.removeChild(el.children[0]);
+  else {
+    const childrenOfType = () =>
+      [...el.children].filter(
+        (child) => child.tagName.toLowerCase() === type.toLowerCase()
+      );
+    while (childrenOfType().length > 0) el.removeChild(childrenOfType()[0]);
+  }
 }
 
 function print(textId, ...args) {
@@ -67,7 +75,7 @@ function getMe() {
 
 function isLobbyOwner() {
   const me = lobbyOthers.find((other) => other.me);
-  return me && me.isFirstPlayer;
+  return me && me.isLobbyOwner;
 }
 
 function updateLobby() {
@@ -78,7 +86,7 @@ function updateLobby() {
     const el = document.createElement("li");
     el.innerText =
       other.name +
-      (other.isFirstPlayer ? " (lobby owner)" : "") +
+      (other.isLobbyOwner ? " (lobby owner)" : "") +
       (other.me ? " (you)" : "");
     players.appendChild(el);
   }
@@ -150,9 +158,10 @@ function nightTime() {
 }
 
 /** @returns {Promise<number|undefined>} */
-function askSelectPlayer(timeout, showOtherMafias) {
+function askSelectPlayer(timeout, showOtherMafias, label) {
   return new Promise((res) => {
     let resolved = false;
+    document.querySelector("#player-selector-label").innerText = label;
     /** @type {HTMLUListElement} */
     const selector = document.querySelector("#player-selector");
     removeChildren(selector);
@@ -224,24 +233,28 @@ function mafiaAskVote() {
   print("activity.mafiaGathering");
   const time = startTime(Date.now(), timeAlloted);
   time.promise.then(() => showChat(true, false));
-  askSelectPlayer(timeAlloted, false).then((player) => {
-    time.cancel();
-    if (player) {
-      ws.send(`mafia_vote ${player}`);
+  askSelectPlayer(timeAlloted, false, "Choose who you want to kill").then(
+    (player) => {
+      time.cancel();
+      if (player) {
+        ws.send(`mafia_vote ${player}`);
+      }
     }
-  });
+  );
 }
 function discussionTime() {
   const timeAlloted = 3 * 60 * 1000;
   print("activity.meeting");
   const time = startTime(Date.now(), timeAlloted);
   time.promise.then(() => showChat(false, false));
-  askSelectPlayer(timeAlloted, true).then((player) => {
-    time.cancel();
-    if (player) {
-      ws.send(`day_kick_vote ${player}`);
+  askSelectPlayer(timeAlloted, true, "Choose who you think is the mafia").then(
+    (player) => {
+      time.cancel();
+      if (player) {
+        ws.send(`day_kick_vote ${player}`);
+      }
     }
-  });
+  );
 }
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -303,7 +316,7 @@ ws.addEventListener("message", (e) => {
       lobbyOthers.push({
         id: Number.parseInt(args[1]),
         name: args.slice(2).join(" "),
-        isFirstPlayer: args[1] === "1",
+        isLobbyOwner: args[1] === "1",
         me: args[0] === "true",
       });
       updateLobby();
