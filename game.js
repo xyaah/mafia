@@ -524,16 +524,26 @@ ws.addEventListener("message", (e) => {
       );
       updateLobby();
       break;
+    case "repick_username":
+      setName(prompt("Enter another name:") ?? "");
+      break;
     default:
       break;
   }
 });
 
+/**
+ * @param {string} name
+ */
+function setName(name) {
+  $('label[for="chat-message"]').textContent = name + ":";
+  ws.send(`join ${name.trim()}`);
+}
+
 ws.addEventListener("open", () => {
   let name;
   while (!name) name = prompt("Enter a name to play with:");
-  $('label[for="chat-message"]').textContent = name + ":";
-  ws.send(`join ${name.trim()}`);
+  setName(name);
 });
 
 $("#start-game").addEventListener("click", () => {
