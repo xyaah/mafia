@@ -1,11 +1,10 @@
 //@ts-check
 
-const isDevelopment =
-  location.hostname === "localhost" || location.hostname === "127.0.0.1";
+const isDevelopment = location.hostname !== "xyaah.github.io";
 
 const ws = new WebSocket(
   isDevelopment
-    ? "ws://localhost:8787/"
+    ? `${location.protocol}//${location.hostname}:8787/`
     : "wss://mafia-matchmaker.xya.workers.dev/",
   [isDevelopment ? "ws" : "wss"]
 );
@@ -127,6 +126,9 @@ function isLobbyOwner() {
   return me && me.isLobbyOwner;
 }
 
+/**
+ * @param {number} role
+ */
 function roleName(role) {
   if (role === Role.Detective) return "Detective";
   else if (role === Role.Doctor) return "Doctor";
@@ -135,9 +137,21 @@ function roleName(role) {
   else return "???";
 }
 
+/**
+ * @type {{
+ *    promise: Promise<void>;
+ *    cancel: () => void;
+ * }|undefined}
+ */
+let _curTimer;
+/**
+ * @param {number} at
+ * @param {number} ms
+ */
 function startTime(at, ms) {
   let doCancel = () => {};
-  return {
+  if (_curTimer) _curTimer.cancel();
+  const timerObj = {
     promise: /** @type {Promise<void>} */ (
       new Promise((res) => {
         timer.style.display = "unset";
@@ -165,9 +179,16 @@ function startTime(at, ms) {
     ),
     cancel: () => doCancel(),
   };
+  _curTimer = timerObj;
+  return timerObj;
 }
 
-/** @returns {Promise<number|undefined>} */
+/**
+ * @returns {Promise<number | undefined>}
+ * @param {number | undefined} timeout
+ * @param {boolean} showOtherMafias
+ * @param {string | null} label
+ */
 function askSelectPlayer(timeout, showOtherMafias, label) {
   return new Promise((res) => {
     let resolved = false;
@@ -270,17 +291,21 @@ function gameStarted() {
   setTimeout(() => print("suspense.identityReveal"), 4000);
 }
 
+/**
+ * @param {number} role
+ */
 function roleRevealed(role) {
   myRole = role;
   story.textContent += roleName(role);
 }
 
 function nightTime() {
+  if (_curTimer) _curTimer.cancel();
   print("time.night");
 }
 
 chatMessage.addEventListener("keyup", (e) => {
-  if (e.code === "Enter") {
+  if (e.code === "Enter" || e.keyCode === 13) {
     const content = chatMessage.value;
     ws.send(
       `${isCurChatMafia ? "mafia_chat_send" : "town_chat_send"} ${content}`
@@ -289,11 +314,20 @@ chatMessage.addEventListener("keyup", (e) => {
   }
 });
 
+/**
+ * @param {number} from
+ * @param {string} content
+ */
 function onChatMessage(from, content) {
   const sender = getPlayerById(others, from);
-  print(`${sender.name}: ${content}`);
+  story.textContent += `\n${sender.name}: ${content}`;
+  story.scrollTop = story.scrollHeight - story.clientHeight;
 }
 
+/**
+ * @param {boolean} isMafiaChat
+ * @param {boolean} show
+ */
 function showChat(isMafiaChat, show) {
   console.log(`show ${isMafiaChat ? "mafia" : "town"} chat: ${show}`);
   isCurChatMafia = isMafiaChat;
@@ -311,7 +345,6 @@ function mafiaAskVote() {
   time.promise.then(() => showChat(true, false));
   askSelectPlayer(timeAlloted, false, "Choose who you want to kill").then(
     (player) => {
-      time.cancel();
       if (player) {
         ws.send(`mafia_vote ${player}`);
       }
@@ -325,7 +358,6 @@ function discussionTime() {
   time.promise.then(() => showChat(false, false));
   askSelectPlayer(timeAlloted, true, "Choose who you think is the mafia").then(
     (player) => {
-      time.cancel();
       if (player) {
         ws.send(`day_kick_vote ${player}`);
       }
@@ -333,16 +365,23 @@ function discussionTime() {
   );
 }
 
+/**
+ * @param {number | null} mafiaKilled
+ */
 function dayTime(mafiaKilled) {
   print("time.day");
+  if (_curTimer) _curTimer.cancel();
   sleep(1500).then(() => {
     mafiaKilled == null
       ? print("announcement.allSurvived")
       : print("announcement.killed", getPlayerById(others, mafiaKilled).name);
-    removePlayer(mafiaKilled);
+    if (mafiaKilled) removePlayer(mafiaKilled);
   });
 }
 
+/**
+ * @param {string} causeOfDeath
+ */
 function onDied(causeOfDeath) {
   switch (causeOfDeath) {
     case "mafia_kill":
@@ -358,6 +397,9 @@ function onDied(causeOfDeath) {
   }
 }
 
+/**
+ * @param {number | null} result
+ */
 function dayVoteResult(result) {
   const voted =
     result == null ? null : others.find((other) => other.id === result);
