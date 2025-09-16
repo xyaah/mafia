@@ -1,3 +1,5 @@
+//@ts-check
+
 const isDevelopment =
   location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
@@ -7,6 +9,26 @@ const ws = new WebSocket(
     : "wss://mafia-matchmaker.xya.workers.dev/",
   [isDevelopment ? "ws" : "wss"]
 );
+
+/**
+ * @template T
+ * @param {string} selector
+ * @returns {T}
+ */
+function $(selector) {
+  // @ts-ignore
+  return document.querySelector(selector);
+}
+
+/** @param {number} ms */
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+/** @type {HTMLPreElement} */
+const story = $("#game-story");
+/** @type {HTMLSpanElement} */
+const timer = $("#timer");
+const chatContainer = $("#chat-container");
+const chatMessage = $("#chat-message");
 
 const textContent = {
   "suspense.gameStart":
@@ -33,6 +55,7 @@ const textContent = {
   "activity.detective.result": "you found out that $0 is a $1.",
 };
 
+/** @enum {number} */
 const Role = {
   Townsperson: 0,
   Mafia: 1,
@@ -40,21 +63,31 @@ const Role = {
   Detective: 3,
 };
 
+/**
+ * @param {number} id
+ */
+function removePlayer(id) {
+  others.splice(
+    others.findIndex((other) => other.id === id),
+    1
+  );
+}
+
+/**
+ * @param {string} message
+ * @returns {string[]}
+ */
 function parseMessage(message) {
   message = message.trim();
   if (!message.includes(" ")) return [message];
   return message.split(" ");
 }
 
-let lobbyOthers = [];
-let others = [];
-let otherMafias = [];
-let myRole;
-
-let detectiveChoice;
-
-/** @param {HTMLElement} el  */
-function removeChildren(el, type) {
+/**
+ * @param {HTMLElement} el
+ * @param {string?} type
+ */
+function removeChildren(el, type = null) {
   if (!type) while (el.children.length > 0) el.removeChild(el.children[0]);
   else {
     const childrenOfType = () =>
@@ -65,55 +98,32 @@ function removeChildren(el, type) {
   }
 }
 
+/**
+ * @param {string} textId
+ * @param {...string} args
+ */
 function print(textId, ...args) {
   /** @type {string} */
   let string = textContent[textId] ?? textId;
   for (let i = 0; i < args.length; i++) {
     string = string.replaceAll("$" + i, args[i]);
   }
-  story.innerText += "\n> " + string;
+  story.textContent += "\n> " + string;
   story.scrollTop = story.scrollHeight - story.clientHeight;
 }
 
+/**
+ * @returns {Other}
+ */
 function getMe() {
-  return [...lobbyOthers, ...others].find((x) => x.me);
+  const me = [...lobbyOthers, ...others].find((x) => x.me);
+  if (!me) throw "Cannot find self in lobbyOthers & others";
+  return me;
 }
 
 function isLobbyOwner() {
   const me = lobbyOthers.find((other) => other.me);
   return me && me.isLobbyOwner;
-}
-
-function updateLobby() {
-  const players = document.querySelector("#lobby #players");
-  removeChildren(players);
-
-  for (const other of lobbyOthers) {
-    const el = document.createElement("li");
-    el.innerText =
-      other.name +
-      (other.isLobbyOwner ? " (lobby owner)" : "") +
-      (other.me ? " (you)" : "");
-    players.appendChild(el);
-  }
-
-  if (!isLobbyOwner()) {
-    document.querySelector("#start-game").disabled = true;
-  } else {
-    document.querySelector("#start-game").disabled = false;
-  }
-}
-
-const story = document.querySelector("#game-story");
-const timer = document.querySelector("#timer");
-
-function gameStarted() {
-  others = [...lobbyOthers];
-  lobbyOthers = [];
-  document.querySelector("#lobby").style.display = "none";
-  document.querySelector("#game-container").style.display = "unset";
-  print("suspense.gameStart");
-  setTimeout(() => print("suspense.identityReveal"), 4000);
 }
 
 function roleName(role) {
@@ -124,52 +134,45 @@ function roleName(role) {
   else return "???";
 }
 
-function roleRevealed(role) {
-  myRole = role;
-  story.innerText += roleName(role);
-}
-
 function startTime(at, ms) {
   let doCancel = () => {};
   return {
-    promise: new Promise((res) => {
-      timer.style.display = "unset";
-      let interval;
-      function stop() {
-        timer.style.display = "none";
-        timer.innerText = "";
-        clearInterval(interval);
-        res();
-      }
-      doCancel = stop;
-      interval = setInterval(() => {
-        const timePassed = Date.now() - at;
-        const timeRem = Math.max(0, ms - timePassed) / 1000;
-        if (timeRem === 0) stop();
-        else {
-          const min = Math.floor(timeRem / 60);
-          const sec = Math.floor(timeRem % 60);
-          timer.innerText = `${min.toString().padStart(2, "0")}:${sec
-            .toString()
-            .padStart(2, "0")}`;
+    promise: /** @type {Promise<void>} */ (
+      new Promise((res) => {
+        timer.style.display = "unset";
+        let interval;
+        function stop() {
+          timer.style.display = "none";
+          timer.textContent = "";
+          clearInterval(interval);
+          res();
         }
-      }, 30);
-    }),
+        doCancel = stop;
+        interval = setInterval(() => {
+          const timePassed = Date.now() - at;
+          const timeRem = Math.max(0, ms - timePassed) / 1000;
+          if (timeRem === 0) stop();
+          else {
+            const min = Math.floor(timeRem / 60);
+            const sec = Math.floor(timeRem % 60);
+            timer.textContent = `${min.toString().padStart(2, "0")}:${sec
+              .toString()
+              .padStart(2, "0")}`;
+          }
+        }, 30);
+      })
+    ),
     cancel: () => doCancel(),
   };
-}
-
-function nightTime() {
-  print("time.night");
 }
 
 /** @returns {Promise<number|undefined>} */
 function askSelectPlayer(timeout, showOtherMafias, label) {
   return new Promise((res) => {
     let resolved = false;
-    document.querySelector("#player-selector-label").innerText = label;
+    $("#player-selector-label").selectorLabel.textContent = label;
     /** @type {HTMLUListElement} */
-    const selector = document.querySelector("#player-selector");
+    const selector = $("#player-selector");
     removeChildren(selector, "li");
     document.body.classList.add("player-selector-open");
     function hide() {
@@ -181,7 +184,7 @@ function askSelectPlayer(timeout, showOtherMafias, label) {
       if (other.me) continue;
       const el = document.createElement("li");
       const btn = document.createElement("button");
-      btn.innerText = other.name;
+      btn.textContent = other.name;
       btn.addEventListener("click", () => {
         if (!resolved) {
           resolved = true;
@@ -203,9 +206,77 @@ function askSelectPlayer(timeout, showOtherMafias, label) {
   });
 }
 
-const chatContainer = document.querySelector("#chat-container");
-const chatMessage = document.querySelector("#chat-message");
+/**
+ * @param {Other[]} players
+ * @param {number} id
+ * @returns {Other}
+ */
+function getPlayerById(players, id) {
+  const player = players.find((player) => player.id === id);
+  if (!player) throw "Player not found: " + id;
+  return player;
+}
+
+/**
+ * @typedef {{
+ *  id: number;
+ *  name: string;
+ *  me: boolean;
+ *  isLobbyOwner: boolean;
+ * }} Other
+ */
+
+/** @type {Other[]} */
+let lobbyOthers = [];
+/** @type {Other[]} */
+let others = [];
+/** @type {number[]} */
+let otherMafias = [];
+let myRole;
+
+let detectiveChoice;
 let isCurChatMafia;
+
+function updateLobby() {
+  /** @type {HTMLUListElement} */
+  const players = $("#lobby #players");
+  /** @type {HTMLButtonElement} */
+  const startGame = $("#start-game");
+  removeChildren(players);
+
+  for (const other of lobbyOthers) {
+    const el = document.createElement("li");
+    el.textContent =
+      other.name +
+      (other.isLobbyOwner ? " (lobby owner)" : "") +
+      (other.me ? " (you)" : "");
+    players.appendChild(el);
+  }
+
+  if (!isLobbyOwner()) {
+    startGame.disabled = true;
+  } else {
+    startGame.disabled = false;
+  }
+}
+
+function gameStarted() {
+  others = [...lobbyOthers];
+  lobbyOthers = [];
+  $("#game-container").style.display = "unset";
+  $("#lobby").style.display = "none";
+  print("suspense.gameStart");
+  setTimeout(() => print("suspense.identityReveal"), 4000);
+}
+
+function roleRevealed(role) {
+  myRole = role;
+  story.textContent += roleName(role);
+}
+
+function nightTime() {
+  print("time.night");
+}
 
 chatMessage.addEventListener("keyup", (e) => {
   if (e.code === "Enter") {
@@ -218,7 +289,7 @@ chatMessage.addEventListener("keyup", (e) => {
 });
 
 function onChatMessage(from, content) {
-  const sender = others.find((other) => other.id === from);
+  const sender = getPlayerById(others, from);
   print(`${sender.name}: ${content}`);
 }
 
@@ -227,9 +298,9 @@ function showChat(isMafiaChat, show) {
   isCurChatMafia = isMafiaChat;
   chatContainer.style.display = show ? "unset" : "none";
   const myName = getMe().name;
-  document.querySelector(
-    'label[for="chat-message"]'
-  ).innerText = `${myName} -> ${isMafiaChat ? "mafia" : "town"}: `;
+  $('label[for="chat-message"]').textContent = `${myName} -> ${
+    isMafiaChat ? "mafia" : "town"
+  }: `;
 }
 
 function mafiaAskVote() {
@@ -261,17 +332,12 @@ function discussionTime() {
   );
 }
 
-const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
-
 function dayTime(mafiaKilled) {
   print("time.day");
   sleep(1500).then(() => {
     mafiaKilled == null
       ? print("announcement.allSurvived")
-      : print(
-          "announcement.killed",
-          others.find((other) => other.id === mafiaKilled).name
-        );
+      : print("announcement.killed", getPlayerById(others, mafiaKilled).name);
     removePlayer(mafiaKilled);
   });
 }
@@ -294,16 +360,9 @@ function onDied(causeOfDeath) {
 function dayVoteResult(result) {
   const voted =
     result == null ? null : others.find((other) => other.id === result);
-  if (voted === null) print("activity.banished.fail");
+  if (voted == null) print("activity.banished.fail");
   else if (!voted.me) print("activity.banished", voted.name);
   if (voted) removePlayer(voted.id);
-}
-
-function removePlayer(id) {
-  others.splice(
-    others.findIndex((other) => other.id === id),
-    1
-  );
 }
 
 ws.addEventListener("message", (e) => {
@@ -410,7 +469,7 @@ ws.addEventListener("message", (e) => {
       if (detectiveChoice) {
         print(
           "activity.detective.result",
-          others.find((other) => other.id === detectiveChoice).name,
+          getPlayerById(others, detectiveChoice).name,
           roleName(Number.parseInt(args[0]))
         );
       }
@@ -421,11 +480,12 @@ ws.addEventListener("message", (e) => {
 });
 
 ws.addEventListener("open", () => {
-  const name = prompt("Enter a name to play with:");
-  document.querySelector('label[for="chat-message"]').innerText = name + ":";
+  let name;
+  while (!name) name = prompt("Enter a name to play with:");
+  $('label[for="chat-message"]').textContent = name + ":";
   ws.send(`join ${name.trim()}`);
 });
 
-document.querySelector("#start-game").addEventListener("click", () => {
+$("#start-game").addEventListener("click", () => {
   ws.send("start_game");
 });
