@@ -55,6 +55,7 @@ const textContent = {
   "activity.detective":
     "as a detective, you have the power to choose one person and you will see their role",
   "activity.detective.result": "you found out that $0 is a $1.",
+  disconnected: "$0 has left the game.",
 };
 
 /** @enum {number} */
@@ -540,6 +541,10 @@ ws.addEventListener("message", (e) => {
           : getPlayerById(others, Number.parseInt(args[0])).name
       );
       break;
+    case "disconnected":
+      const id = Number.parseInt(args[0]);
+      print("disconnected", getPlayerById(others, id).name);
+      removePlayer(id);
     default:
       break;
   }
