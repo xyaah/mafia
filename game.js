@@ -517,6 +517,13 @@ ws.addEventListener("message", (e) => {
         );
       }
       break;
+    case "lobby_disconnect":
+      lobbyOthers.splice(
+        lobbyOthers.findIndex((other) => other.id === Number.parseInt(args[0])),
+        1
+      );
+      updateLobby();
+      break;
     default:
       break;
   }
