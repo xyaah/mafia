@@ -81,8 +81,8 @@ body,
   top: 0;
   left: 50%;
   transform: translate(-50%, 0);
-  width: 50px;
-  height: 30px;
+  width: 70px;
+  height: 20px;
   border-radius: 5px;
   text-align: center;
   vertical-align: middle;
@@ -113,4 +113,19 @@ body,
   height: 20px;
   background-color: var(--content-nested2-bg-color);
   color: var(--text-color);
+}
+
+#game-story {
+  width: 100%;
+  height: 80%;
+  text-wrap: auto;
+  overflow-y: scroll;
+}
+
+.player-selector-open #game-story {
+  width: 60%;
+}
+
+#player-selector h2 {
+  font-size: large;
 }

@@ -28,6 +28,9 @@ const textContent = {
     "you have won this game as a $0. $1 players survived while $2 players died",
   "activity.loss":
     "you have lost this game as a $0. $1 players survived while $2 players died",
+  "activity.detective":
+    "as a detective, you have the power to choose one person and you will see their role",
+  "activity.detective.result": "you found out that $0 is a $1.",
 };
 
 const Role = {
@@ -48,6 +51,8 @@ let others = [];
 let otherMafias = [];
 let myRole;
 
+let detectiveChoice;
+
 /** @param {HTMLElement} el  */
 function removeChildren(el, type) {
   if (!type) while (el.children.length > 0) el.removeChild(el.children[0]);
@@ -67,6 +72,7 @@ function print(textId, ...args) {
     string = string.replaceAll("$" + i, args[i]);
   }
   story.innerText += "\n> " + string;
+  story.scrollTop = story.scrollHeight - story.clientHeight;
 }
 
 function getMe() {
@@ -164,8 +170,10 @@ function askSelectPlayer(timeout, showOtherMafias, label) {
     document.querySelector("#player-selector-label").innerText = label;
     /** @type {HTMLUListElement} */
     const selector = document.querySelector("#player-selector");
-    removeChildren(selector);
+    removeChildren(selector, "li");
+    document.body.classList.add("player-selector-open");
     function hide() {
+      document.body.classList.remove("player-selector-open");
       selector.style.display = "none";
     }
     for (const other of others) {
@@ -196,7 +204,6 @@ function askSelectPlayer(timeout, showOtherMafias, label) {
 }
 
 const chatContainer = document.querySelector("#chat-container");
-const chatHistory = document.querySelector("#chat-history");
 const chatMessage = document.querySelector("#chat-message");
 let isCurChatMafia;
 
@@ -211,10 +218,8 @@ chatMessage.addEventListener("keyup", (e) => {
 });
 
 function onChatMessage(from, content) {
-  const li = document.createElement("li");
   const sender = others.find((other) => other.id === from);
-  li.innerText = `${sender.name}: ${content}`;
-  chatHistory.appendChild(li);
+  print(`${sender.name}: ${content}`);
 }
 
 function showChat(isMafiaChat, show) {
@@ -225,7 +230,6 @@ function showChat(isMafiaChat, show) {
   document.querySelector(
     'label[for="chat-message"]'
   ).innerText = `${myName} -> ${isMafiaChat ? "mafia" : "town"}: `;
-  removeChildren(chatHistory);
 }
 
 function mafiaAskVote() {
@@ -290,9 +294,9 @@ function onDied(causeOfDeath) {
 function dayVoteResult(result) {
   const voted =
     result == null ? null : others.find((other) => other.id === result);
-  if (!voted.me) print("activity.banished", voted.name);
   if (voted === null) print("activity.banished.fail");
-  removePlayer(voted.id);
+  else if (!voted.me) print("activity.banished", voted.name);
+  if (voted) removePlayer(voted.id);
 }
 
 function removePlayer(id) {
@@ -390,6 +394,26 @@ ws.addEventListener("message", (e) => {
         args[1],
         args[2]
       );
+      break;
+    case "detective_turn":
+      print("activity.detective");
+      askSelectPlayer(
+        3 * 60 * 1000,
+        false,
+        "Select a person to see their role."
+      ).then((value) => {
+        detectiveChoice = value;
+        if (value) ws.send(`detective_peek ${value}`);
+      });
+      break;
+    case "detective_result":
+      if (detectiveChoice) {
+        print(
+          "activity.detective.result",
+          others.find((other) => other.id === detectiveChoice).name,
+          roleName(Number.parseInt(args[0]))
+        );
+      }
       break;
     default:
       break;
