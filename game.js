@@ -37,6 +37,8 @@ const textContent = {
   "time.night": "night falls over the town. you are immersed in darkness..",
   "activity.mafiaGathering":
     "the mafia gathers secretly to decide on someone to kill...",
+  "activity.mafiaGathering.result": "the mafia decided to kill $0",
+  "activity.mafiaGathering.result.fail": "the mafia couldn't agree who to kill",
   "activity.meeting": "the town holds a meeting to discover the mafias...",
   "time.day": "the sun rises, and another day begins",
   "announcement.allSurvived": "it seems everyone has survived this night",
@@ -100,7 +102,7 @@ function removeChildren(el, type = null) {
 
 /**
  * @param {string} textId
- * @param {...string} args
+ * @param {...any} args
  */
 function print(textId, ...args) {
   /** @type {string} */
@@ -526,6 +528,17 @@ ws.addEventListener("message", (e) => {
       break;
     case "repick_username":
       setName(prompt("Enter another name:") ?? "");
+      break;
+    case "mafia_vote_result":
+      const failed = args[0] === "null";
+      print(
+        failed
+          ? "activity.mafiaGathering.result.fail"
+          : "activity.mafiaGathering.result",
+        failed
+          ? undefined
+          : getPlayerById(others, Number.parseInt(args[0])).name
+      );
       break;
     default:
       break;
