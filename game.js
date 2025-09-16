@@ -11,7 +11,7 @@ const ws = new WebSocket(
 );
 
 /**
- * @template T
+ * @template {HTMLElement} T
  * @param {string} selector
  * @returns {T}
  */
@@ -28,6 +28,7 @@ const story = $("#game-story");
 /** @type {HTMLSpanElement} */
 const timer = $("#timer");
 const chatContainer = $("#chat-container");
+/** @type {HTMLInputElement} */
 const chatMessage = $("#chat-message");
 
 const textContent = {
@@ -170,7 +171,7 @@ function startTime(at, ms) {
 function askSelectPlayer(timeout, showOtherMafias, label) {
   return new Promise((res) => {
     let resolved = false;
-    $("#player-selector-label").selectorLabel.textContent = label;
+    $("#player-selector-label").textContent = label;
     /** @type {HTMLUListElement} */
     const selector = $("#player-selector");
     removeChildren(selector, "li");
