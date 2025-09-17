@@ -414,17 +414,20 @@ function dayTime(mafiaKilled, doctorSaved) {
  */
 function onDied(causeOfDeath) {
   switch (causeOfDeath) {
-    case "mafia_kill":
+    case "mafia_kill": {
       print("killed.mafia");
       break;
+    }
 
-    case "mafia_kill_at_day":
+    case "mafia_kill_at_day": {
       print("killed.mafia.atDay");
       break;
+    }
 
-    case "town_vote":
+    case "town_vote": {
       print("killed.vote");
       break;
+    }
 
     default:
       break;
@@ -516,7 +519,7 @@ ws.addEventListener("message", (e) => {
       dayVoteResult(result);
       break;
     }
-    case "win":
+    case "win": {
       print(
         "activity.win",
         roleName(Number.parseInt(args[0])),
@@ -524,7 +527,8 @@ ws.addEventListener("message", (e) => {
         args[2]
       );
       break;
-    case "loss":
+    }
+    case "loss": {
       print(
         "activity.loss",
         roleName(Number.parseInt(args[0])),
@@ -532,7 +536,8 @@ ws.addEventListener("message", (e) => {
         args[2]
       );
       break;
-    case "detective_turn":
+    }
+    case "detective_turn": {
       print("activity.detective");
       askSelectPlayer(
         3 * 60 * 1000,
@@ -544,7 +549,8 @@ ws.addEventListener("message", (e) => {
         if (value) ws.send(`detective_peek ${value}`);
       });
       break;
-    case "detective_result":
+    }
+    case "detective_result": {
       if (detectiveChoice) {
         print(
           "activity.detective.result",
@@ -553,17 +559,20 @@ ws.addEventListener("message", (e) => {
         );
       }
       break;
-    case "lobby_disconnect":
+    }
+    case "lobby_disconnect": {
       lobbyOthers.splice(
         lobbyOthers.findIndex((other) => other.id === Number.parseInt(args[0])),
         1
       );
       updateLobby();
       break;
-    case "repick_username":
+    }
+    case "repick_username": {
       setName(prompt("Enter another name:") ?? "");
       break;
-    case "mafia_vote_result":
+    }
+    case "mafia_vote_result": {
       const failed = args[0] === "null";
       print(
         failed
@@ -574,12 +583,14 @@ ws.addEventListener("message", (e) => {
           : getPlayerById(others, Number.parseInt(args[0])).name
       );
       break;
-    case "disconnected":
+    }
+    case "disconnected": {
       const id = Number.parseInt(args[0]);
       print("disconnected", getPlayerById(others, id).name);
       removePlayer(id);
       break;
-    case "doctor_turn":
+    }
+    case "doctor_turn": {
       print("activity.doctor");
       askSelectPlayer(3 * 60 * 1000, null, true, "Select someone to save").then(
         (result) => {
@@ -587,13 +598,15 @@ ws.addEventListener("message", (e) => {
         }
       );
       break;
-    case "lobby_chat":
+    }
+    case "lobby_chat": {
       const sender = getPlayerById(lobbyOthers, Number.parseInt(args[0]));
       const content = args.slice(1).join(" ");
       $("#lobby-chat-history").textContent += `\n${
         sender.isLobbyOwner ? "(lobby owner) " : ""
       }${sender.name}: ${content}`;
       break;
+    }
     case "lobby_owner_transfer": {
       const id = Number.parseInt(args[0]);
       const newOwner = getPlayerById(lobbyOthers, id);
