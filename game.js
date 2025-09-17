@@ -29,6 +29,8 @@ const timer = $("#timer");
 const chatContainer = $("#chat-container");
 /** @type {HTMLInputElement} */
 const chatMessage = $("#chat-message");
+/** @type {HTMLInputElement} */
+const lobbyChatMessage = $("#lobby-chat-message");
 
 const textContent = {
   "suspense.gameStart":
@@ -320,6 +322,13 @@ chatMessage.addEventListener("keyup", (e) => {
     chatMessage.value = "";
   }
 });
+lobbyChatMessage.addEventListener("keyup", (e) => {
+  if (e.code === "Enter" || e.keyCode === 13) {
+    const content = lobbyChatMessage.value;
+    ws.send(`lobby_chat ${content}`);
+    lobbyChatMessage.value = "";
+  }
+});
 
 /**
  * @param {number} from
@@ -445,9 +454,9 @@ ws.addEventListener("message", (e) => {
     }
     case "lobby_new_member": {
       lobbyOthers.push({
-        id: Number.parseInt(args[1]),
-        name: args.slice(2).join(" "),
-        isLobbyOwner: args[1] === "1",
+        id: Number.parseInt(args[2]),
+        name: args.slice(3).join(" "),
+        isLobbyOwner: args[1] === "true",
         me: args[0] === "true",
       });
       updateLobby();
@@ -578,6 +587,21 @@ ws.addEventListener("message", (e) => {
         }
       );
       break;
+    case "lobby_chat":
+      const sender = getPlayerById(lobbyOthers, Number.parseInt(args[0]));
+      const content = args.slice(1).join(" ");
+      $("#lobby-chat-history").textContent += `\n${
+        sender.isLobbyOwner ? "(lobby owner) " : ""
+      }${sender.name}: ${content}`;
+      break;
+    case "lobby_owner_transfer": {
+      const id = Number.parseInt(args[0]);
+      const newOwner = getPlayerById(lobbyOthers, id);
+      if (!newOwner) break;
+      newOwner.isLobbyOwner = true;
+      updateLobby();
+      break;
+    }
     default:
       break;
   }
@@ -587,7 +611,7 @@ ws.addEventListener("message", (e) => {
  * @param {string} name
  */
 function setName(name) {
-  $('label[for="chat-message"]').textContent = name + ":";
+  $('label[for="lobby-chat-message"]').textContent = name + ":";
   ws.send(`join ${name.trim()}`);
 }
 

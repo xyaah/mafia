@@ -12,6 +12,14 @@
     <div id="lobby">
       <ul id="players"></ul>
       <button id="start-game" disabled>Start game</button>
+      <div id="lobby-chat-container">
+        <pre id="lobby-chat-history"></pre>
+        <div id="lobby-chat-send-container">
+          <label for="lobby-chat-message"
+            ><!-- to be replaced with username --></label
+          ><br /><input type="text" id="lobby-chat-message" />
+        </div>
+      </div>
     </div>
     <div id="game-container" style="display: none">
       <span style="display: none" id="timer"></span>

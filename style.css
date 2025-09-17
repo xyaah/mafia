@@ -51,7 +51,7 @@ body,
 
 #start-game {
   position: absolute;
-  top: 50%;
+  top: 20%;
   left: 30%;
   transform: translate(-50%, -50%);
   width: 40%;
@@ -74,6 +74,55 @@ body,
   border-color: black;
   background-color: grey;
   color: white;
+}
+
+#lobby-chat-container {
+  position: absolute;
+  top: 35%;
+  left: 30.75%;
+  width: 60%;
+  height: 64%;
+  transform: translate(-50%, 0);
+  background-color: var(--content-nested-bg2-color);
+  border-radius: inherit;
+}
+
+#lobby-chat-history {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 80%;
+}
+
+#lobby-chat-send-container {
+  position: absolute;
+  width: 100%;
+  height: 20%;
+  bottom: 0;
+  left: 0;
+}
+
+#lobby-chat-send-container #lobby-chat-message {
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  width: 60%;
+  transform: translate(-50%, -50%);
+  height: 50%;
+  background-color: var(--content-bg-color);
+  color: var(--text-color);
+}
+
+#lobby-chat-send-container label[for=lobby-chat-message] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 50%;
+  font-weight: bolder;
+  text-align: center;
+  vertical-align: top;
 }
 
 #timer {
