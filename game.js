@@ -45,6 +45,8 @@ const textContent = {
   "announcement.killed":
     "the town soon discovers that $0 was killed last night by the mafia",
   "killed.mafia": "the mafia has killed you. this is it for you",
+  "killed.mafia.atDay":
+    "only you and one mafia remain, they will kill you for sure",
   "killed.vote": "the town has banished you. this is where your story ends",
   "activity.banished": "the town has decided to banish $0",
   "activity.banished.fail": "the town couldn't agree on someone to banish",
@@ -56,6 +58,10 @@ const textContent = {
     "as a detective, you have the power to choose one person and you will see their role",
   "activity.detective.result": "you found out that $0 is a $1.",
   disconnected: "$0 has left the game.",
+  "activity.doctor":
+    "as a doctor, you can choose one person that cannot be killed by the mafia tonight",
+  "announcement.killedButSaved":
+    "the mafia tried to kill $0, but the doctor saved them",
 };
 
 /** @enum {number} */
@@ -113,15 +119,6 @@ function print(textId, ...args) {
   }
   story.textContent += "\n> " + string;
   story.scrollTop = story.scrollHeight - story.clientHeight;
-}
-
-/**
- * @returns {Other}
- */
-function getMe() {
-  const me = [...lobbyOthers, ...others].find((x) => x.me);
-  if (!me) throw "Cannot find self in lobbyOthers & others";
-  return me;
 }
 
 function isLobbyOwner() {
@@ -189,10 +186,11 @@ function startTime(at, ms) {
 /**
  * @returns {Promise<number | undefined>}
  * @param {number | undefined} timeout
- * @param {boolean} showOtherMafias
+ * @param {boolean?} showOtherMafias
+ * @param {boolean} showSelf
  * @param {string | null} label
  */
-function askSelectPlayer(timeout, showOtherMafias, label) {
+function askSelectPlayer(timeout, showOtherMafias, showSelf, label) {
   return new Promise((res) => {
     let resolved = false;
     $("#player-selector-label").textContent = label;
@@ -205,8 +203,14 @@ function askSelectPlayer(timeout, showOtherMafias, label) {
       selector.style.display = "none";
     }
     for (const other of others) {
+      console.log(
+        other,
+        otherMafias.includes(other.id),
+        showOtherMafias,
+        showSelf
+      );
       if (otherMafias.includes(other.id) && !showOtherMafias) continue;
-      if (other.me) continue;
+      if (other.me && !showSelf) continue;
       const el = document.createElement("li");
       const btn = document.createElement("button");
       btn.textContent = other.name;
@@ -335,7 +339,9 @@ function showChat(isMafiaChat, show) {
   console.log(`show ${isMafiaChat ? "mafia" : "town"} chat: ${show}`);
   isCurChatMafia = isMafiaChat;
   chatContainer.style.display = show ? "unset" : "none";
-  const myName = getMe().name;
+  const me = others.find((other) => other.me);
+  if (!me) throw "Couldn't find self.";
+  const myName = me.name;
   $('label[for="chat-message"]').textContent = `${myName} -> ${
     isMafiaChat ? "mafia" : "town"
   }: `;
@@ -346,37 +352,49 @@ function mafiaAskVote() {
   print("activity.mafiaGathering");
   const time = startTime(Date.now(), timeAlloted);
   time.promise.then(() => showChat(true, false));
-  askSelectPlayer(timeAlloted, false, "Choose who you want to kill").then(
-    (player) => {
-      if (player) {
-        ws.send(`mafia_vote ${player}`);
-      }
+  askSelectPlayer(
+    timeAlloted,
+    false,
+    false,
+    "Choose who you want to kill"
+  ).then((player) => {
+    if (player) {
+      ws.send(`mafia_vote ${player}`);
     }
-  );
+  });
 }
 function discussionTime() {
   const timeAlloted = 3 * 60 * 1000;
   print("activity.meeting");
   const time = startTime(Date.now(), timeAlloted);
   time.promise.then(() => showChat(false, false));
-  askSelectPlayer(timeAlloted, true, "Choose who you think is the mafia").then(
-    (player) => {
-      if (player) {
-        ws.send(`day_kick_vote ${player}`);
-      }
+  askSelectPlayer(
+    timeAlloted,
+    true,
+    false,
+    "Choose who you think is the mafia"
+  ).then((player) => {
+    if (player) {
+      ws.send(`day_kick_vote ${player}`);
     }
-  );
+  });
 }
 
 /**
  * @param {number | null} mafiaKilled
+ * @param {number | null} doctorSaved
  */
-function dayTime(mafiaKilled) {
+function dayTime(mafiaKilled, doctorSaved) {
   print("time.day");
   if (_curTimer) _curTimer.cancel();
   sleep(1500).then(() => {
     mafiaKilled == null
       ? print("announcement.allSurvived")
+      : doctorSaved === mafiaKilled
+      ? print(
+          "announcement.killedButSaved",
+          getPlayerById(others, mafiaKilled).name
+        )
       : print("announcement.killed", getPlayerById(others, mafiaKilled).name);
     if (mafiaKilled) removePlayer(mafiaKilled);
   });
@@ -389,6 +407,10 @@ function onDied(causeOfDeath) {
   switch (causeOfDeath) {
     case "mafia_kill":
       print("killed.mafia");
+      break;
+
+    case "mafia_kill_at_day":
+      print("killed.mafia.atDay");
       break;
 
     case "town_vote":
@@ -476,7 +498,8 @@ ws.addEventListener("message", (e) => {
     }
     case "daytime": {
       const mafiaKilled = args[0] === "null" ? null : Number.parseInt(args[0]);
-      dayTime(mafiaKilled);
+      const doctorSaved = args[1] === "null" ? null : Number.parseInt(args[1]);
+      dayTime(mafiaKilled, doctorSaved);
       break;
     }
     case "day_vote_result": {
@@ -504,6 +527,7 @@ ws.addEventListener("message", (e) => {
       print("activity.detective");
       askSelectPlayer(
         3 * 60 * 1000,
+        null,
         false,
         "Select a person to see their role."
       ).then((value) => {
@@ -545,6 +569,15 @@ ws.addEventListener("message", (e) => {
       const id = Number.parseInt(args[0]);
       print("disconnected", getPlayerById(others, id).name);
       removePlayer(id);
+      break;
+    case "doctor_turn":
+      print("activity.doctor");
+      askSelectPlayer(3 * 60 * 1000, null, true, "Select someone to save").then(
+        (result) => {
+          if (result) ws.send(`doctor_save ${result}`);
+        }
+      );
+      break;
     default:
       break;
   }
